@@ -1,6 +1,6 @@
 import { Header } from './components/Header'
 
-import { GifModule, CirclesModule, IconsModule, MiscModule } from './components/Modules'
+import { GifModule, CirclesModule, IconsModule, MiscModule, CryptoModule } from './components/Modules'
 
 import { Container } from './styles'
 
@@ -28,6 +28,11 @@ export const Preferences = () => {
         <div className="module-segment">
           <div className="module-segmentLabel">Misc</div>
           <MiscModule />
+        </div>
+
+        <div className="module-segment">
+          <div className="module-segmentLabel">Crypto</div>
+          <CryptoModule />
         </div>
       </div>
     </Container>

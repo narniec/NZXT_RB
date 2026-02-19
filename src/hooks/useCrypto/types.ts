@@ -1,8 +1,10 @@
 export interface ICryptoData {
-  btcPrice: number | null
-  btcChange24h: number | null
-  btcHistory: number[]
+  coinPrice: number | null
+  coinChange24h: number | null
+  coinHistory: number[]
+  coinSymbol: string
+  coinName: string
   usdRub: number | null
-  btcStale: boolean
+  coinStale: boolean
   fxStale: boolean
 }

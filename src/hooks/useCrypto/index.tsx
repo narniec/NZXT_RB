@@ -1,15 +1,36 @@
 /**
  * useCrypto — React hook that fetches and caches:
- *   • BTC/USD price + 24h change  (refresh every 30s)
- *   • BTC 24h price history       (refresh every 5min, for sparkline)
- *   • USD/RUB exchange rate       (refresh every 5min)
+ *   • Coin/USD price + 24h change  (configurable interval, default 30s)
+ *   • Coin 24h price history       (configurable interval, default 5min)
+ *   • USD/RUB exchange rate        (configurable interval, default 5min)
  *
+ * Coin selection and intervals are read from useCryptoStore (persisted).
  * Each data type has a 3-provider fallback chain (all CORS-safe, no API key needed).
  * Failed fetches fall back to localStorage cache; stale data is flagged.
  */
 
 import React from 'react'
 import { ICryptoData } from './types'
+import { useCryptoStore } from 'store/crypto'
+import { TCoinId } from 'store/crypto/types'
+
+// ─── Coin metadata ─────────────────────────────────────────────────────────────
+
+interface CoinMeta {
+  cgId: string
+  ccId: string
+  symbol: string
+  name: string
+  hasBlockchain: boolean
+}
+
+const COINS: Record<TCoinId, CoinMeta> = {
+  BTC: { cgId: 'bitcoin',     ccId: 'bitcoin',      symbol: '₿',   name: 'BTC', hasBlockchain: true  },
+  ETH: { cgId: 'ethereum',    ccId: 'ethereum',     symbol: 'Ξ',   name: 'ETH', hasBlockchain: false },
+  SOL: { cgId: 'solana',      ccId: 'solana',       symbol: '◎',   name: 'SOL', hasBlockchain: false },
+  BNB: { cgId: 'binancecoin', ccId: 'binance-coin', symbol: 'BNB', name: 'BNB', hasBlockchain: false },
+  XRP: { cgId: 'ripple',      ccId: 'xrp',          symbol: '✕',   name: 'XRP', hasBlockchain: false },
+}
 
 // ─── localStorage cache helpers ──────────────────────────────────────────────
 
@@ -43,17 +64,18 @@ async function get(url: string, signal: AbortSignal): Promise<unknown> {
 
 type PriceResult = { price: number; change24h: number | null }
 
-async function fetchBtcPrice(signal: AbortSignal): Promise<PriceResult | null> {
+async function fetchCoinPrice(meta: CoinMeta, signal: AbortSignal): Promise<PriceResult | null> {
   const providers: Array<() => Promise<PriceResult>> = [
     async () => {
       const j = (await get(
-        'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true',
+        `https://api.coingecko.com/api/v3/simple/price?ids=${meta.cgId}&vs_currencies=usd&include_24hr_change=true`,
         signal,
-      )) as { bitcoin: { usd: number; usd_24h_change: number } }
-      return { price: j.bitcoin.usd, change24h: j.bitcoin.usd_24h_change ?? null }
+      )) as Record<string, { usd: number; usd_24h_change: number }>
+      const d = j[meta.cgId]
+      return { price: d.usd, change24h: d.usd_24h_change ?? null }
     },
     async () => {
-      const j = (await get('https://api.coincap.io/v2/assets/bitcoin', signal)) as {
+      const j = (await get(`https://api.coincap.io/v2/assets/${meta.ccId}`, signal)) as {
         data: { priceUsd: string; changePercent24Hr: string }
       }
       return {
@@ -61,13 +83,14 @@ async function fetchBtcPrice(signal: AbortSignal): Promise<PriceResult | null> {
         change24h: parseFloat(j.data.changePercent24Hr),
       }
     },
-    async () => {
-      const j = (await get('https://blockchain.info/ticker', signal)) as {
-        USD: { last: number }
-      }
-      return { price: j.USD.last, change24h: null }
-    },
   ]
+
+  if (meta.hasBlockchain) {
+    providers.push(async () => {
+      const j = (await get('https://blockchain.info/ticker', signal)) as { USD: { last: number } }
+      return { price: j.USD.last, change24h: null }
+    })
+  }
 
   for (const fn of providers) {
     try {
@@ -80,11 +103,11 @@ async function fetchBtcPrice(signal: AbortSignal): Promise<PriceResult | null> {
   return null
 }
 
-async function fetchBtcHistory(signal: AbortSignal): Promise<number[] | null> {
+async function fetchCoinHistory(meta: CoinMeta, signal: AbortSignal): Promise<number[] | null> {
   const providers: Array<() => Promise<number[]>> = [
     async () => {
       const j = (await get(
-        'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1&interval=hourly',
+        `https://api.coingecko.com/api/v3/coins/${meta.cgId}/market_chart?vs_currency=usd&days=1&interval=hourly`,
         signal,
       )) as { prices: [number, number][] }
       return j.prices.map(([, p]) => p)
@@ -93,7 +116,7 @@ async function fetchBtcHistory(signal: AbortSignal): Promise<number[] | null> {
       const end = Date.now()
       const start = end - 86_400_000
       const j = (await get(
-        `https://api.coincap.io/v2/assets/bitcoin/history?interval=h1&start=${start}&end=${end}`,
+        `https://api.coincap.io/v2/assets/${meta.ccId}/history?interval=h1&start=${start}&end=${end}`,
         signal,
       )) as { data: { priceUsd: string }[] }
       return j.data.map(d => parseFloat(d.priceUsd))
@@ -151,59 +174,74 @@ async function fetchUsdRub(signal: AbortSignal): Promise<number | null> {
   return null
 }
 
-// ─── Initial state from cache (shows instantly on mount) ─────────────────────
-
-function initFromCache(): ICryptoData {
-  const btc = loadCache<PriceResult>('btc_price')
-  const hist = loadCache<number[]>('btc_history')
-  const rub = loadCache<number>('usd_rub')
-  return {
-    btcPrice: btc?.price ?? null,
-    btcChange24h: btc?.change24h ?? null,
-    btcHistory: hist ?? [],
-    usdRub: rub ?? null,
-    // mark as stale if loaded from cache (fresh fetch will clear the flag)
-    btcStale: btc !== null,
-    fxStale: rub !== null,
-  }
-}
-
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export const useCrypto = (): ICryptoData => {
-  const [data, setData] = React.useState<ICryptoData>(initFromCache)
+  const { coin, priceIntervalMs, historyIntervalMs, fxIntervalMs } = useCryptoStore()
+
+  const [data, setData] = React.useState<ICryptoData>(() => {
+    const meta = COINS[coin]
+    const priceKey = `${coin.toLowerCase()}_price`
+    const historyKey = `${coin.toLowerCase()}_history`
+    const price = loadCache<PriceResult>(priceKey)
+    const hist  = loadCache<number[]>(historyKey)
+    const rub   = loadCache<number>('usd_rub')
+    return {
+      coinPrice:    price?.price ?? null,
+      coinChange24h: price?.change24h ?? null,
+      coinHistory:  hist ?? [],
+      coinSymbol:   meta.symbol,
+      coinName:     meta.name,
+      usdRub:       rub ?? null,
+      coinStale:    price !== null,
+      fxStale:      rub !== null,
+    }
+  })
 
   React.useEffect(() => {
     const ac = new AbortController()
     const { signal } = ac
+    const meta = COINS[coin]
+    const priceKey = `${coin.toLowerCase()}_price`
+    const historyKey = `${coin.toLowerCase()}_history`
 
-    // --- BTC price ---
+    // Load cached data for this coin immediately (covers coin-change transition)
+    const cachedPrice = loadCache<PriceResult>(priceKey)
+    const cachedHist  = loadCache<number[]>(historyKey)
+    setData(s => ({
+      ...s,
+      coinPrice:     cachedPrice?.price ?? null,
+      coinChange24h: cachedPrice?.change24h ?? null,
+      coinHistory:   cachedHist ?? [],
+      coinSymbol:    meta.symbol,
+      coinName:      meta.name,
+      coinStale:     cachedPrice !== null,
+    }))
+
     async function refreshPrice() {
-      const r = await fetchBtcPrice(signal)
+      const r = await fetchCoinPrice(meta, signal)
       if (signal.aborted) return
       if (r) {
-        saveCache('btc_price', r)
-        setData(s => ({ ...s, btcPrice: r.price, btcChange24h: r.change24h, btcStale: false }))
+        saveCache(priceKey, r)
+        setData(s => ({ ...s, coinPrice: r.price, coinChange24h: r.change24h, coinStale: false }))
       } else {
-        const cached = loadCache<PriceResult>('btc_price')
-        if (cached) setData(s => ({ ...s, btcPrice: cached.price, btcChange24h: cached.change24h, btcStale: true }))
+        const cached = loadCache<PriceResult>(priceKey)
+        if (cached) setData(s => ({ ...s, coinPrice: cached.price, coinChange24h: cached.change24h, coinStale: true }))
       }
     }
 
-    // --- BTC sparkline history ---
     async function refreshHistory() {
-      const prices = await fetchBtcHistory(signal)
+      const prices = await fetchCoinHistory(meta, signal)
       if (signal.aborted) return
       if (prices) {
-        saveCache('btc_history', prices)
-        setData(s => ({ ...s, btcHistory: prices }))
+        saveCache(historyKey, prices)
+        setData(s => ({ ...s, coinHistory: prices }))
       } else {
-        const cached = loadCache<number[]>('btc_history')
-        if (cached) setData(s => ({ ...s, btcHistory: cached }))
+        const cached = loadCache<number[]>(historyKey)
+        if (cached) setData(s => ({ ...s, coinHistory: cached }))
       }
     }
 
-    // --- USD/RUB ---
     async function refreshFx() {
       const rate = await fetchUsdRub(signal)
       if (signal.aborted) return
@@ -216,14 +254,13 @@ export const useCrypto = (): ICryptoData => {
       }
     }
 
-    // Fire immediately, then poll
     refreshPrice()
     refreshHistory()
     refreshFx()
 
-    const t1 = setInterval(refreshPrice, 30_000)
-    const t2 = setInterval(refreshHistory, 300_000)
-    const t3 = setInterval(refreshFx, 300_000)
+    const t1 = setInterval(refreshPrice, priceIntervalMs)
+    const t2 = setInterval(refreshHistory, historyIntervalMs)
+    const t3 = setInterval(refreshFx, fxIntervalMs)
 
     return () => {
       ac.abort()
@@ -231,7 +268,7 @@ export const useCrypto = (): ICryptoData => {
       clearInterval(t2)
       clearInterval(t3)
     }
-  }, [])
+  }, [coin, priceIntervalMs, historyIntervalMs, fxIntervalMs])
 
   return data
 }

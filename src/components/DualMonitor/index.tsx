@@ -15,7 +15,7 @@ import { Sparkline } from 'components/Sparkline'
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
-function fmtBtc(price: number | null): string {
+function fmtCoin(price: number | null): string {
   if (price === null) return '—'
   return '$' + Math.round(price).toLocaleString('en-US')
 }
@@ -138,9 +138,9 @@ export const DualMonitor = () => {
     </div>
   )
 
-  // ── Crypto panel (BTC + sparkline + USD/RUB) ───────────────────────────────
-  const btcChangeStr = fmtChange(crypto.btcChange24h)
-  const btcDir = changeDir(crypto.btcChange24h)
+  // ── Crypto panel (coin + sparkline + USD/RUB) ──────────────────────────────
+  const btcChangeStr = fmtChange(crypto.coinChange24h)
+  const btcDir = changeDir(crypto.coinChange24h)
   // Use the right-ring accent colour for the sparkline so it matches the theme
   const sparkColor = krakenStore.rightCircleStart.color
 
@@ -151,7 +151,7 @@ export const DualMonitor = () => {
 
   // USD/RUB row — shown at top alongside CPU/GPU
   const RubRow = () => (
-    <div className="crypto-info" style={textStyle}>
+    <div className="crypto-info crypto-info--top" style={textStyle}>
       <div className="crypto-row">
         <span className="crypto-icon">₽</span>
         <span className="crypto-value">{fmtRub(crypto.usdRub)}</span>
@@ -160,8 +160,8 @@ export const DualMonitor = () => {
     </div>
   )
 
-  // BTC + sparkline — shown at bottom
-  const BtcSection = () => (
+  // Coin + sparkline — shown at bottom
+  const CoinSection = () => (
     <>
       {/* Thin divider between hardware section and crypto section */}
       <div
@@ -171,23 +171,23 @@ export const DualMonitor = () => {
 
       <div className="crypto-info" style={textStyle}>
         {/* Sparkline */}
-        {crypto.btcHistory.length >= 2 && (
+        {crypto.coinHistory.length >= 2 && (
           <Sparkline
-            prices={crypto.btcHistory}
+            prices={crypto.coinHistory}
             color={sparkColor}
             width={196}
             height={22}
           />
         )}
 
-        {/* BTC row */}
+        {/* Coin row */}
         <div className="crypto-row">
-          <span className="crypto-icon">₿</span>
-          <span className="crypto-value">{fmtBtc(crypto.btcPrice)}</span>
+          <span className="crypto-icon">{crypto.coinSymbol}</span>
+          <span className="crypto-value">{fmtCoin(crypto.coinPrice)}</span>
           {btcChangeStr && (
             <span className={`crypto-change ${btcDir}`}>{btcChangeStr}</span>
           )}
-          {crypto.btcStale && <span className="stale-dot" title="Cached" />}
+          {crypto.coinStale && <span className="stale-dot" title="Cached" />}
         </div>
       </div>
     </>
@@ -251,8 +251,8 @@ export const DualMonitor = () => {
           <Gpu />
         </div>
 
-        {/* Sparkline + BTC — bottom area */}
-        <BtcSection />
+        {/* Sparkline + Coin — bottom area */}
+        <CoinSection />
       </Progress>
     </Container>
   )

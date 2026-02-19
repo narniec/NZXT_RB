@@ -113,8 +113,13 @@ export const Container = styled.div`
   }
 
   .crypto-icon {
-    font-size: 6.5vw;
+    font-size: 6.2vw;
     opacity: 0.8;
+  }
+
+  /* RubRow sits tight above the monitoring section */
+  .crypto-info--top {
+    margin-bottom: -5px;
   }
 
   .crypto-value {
