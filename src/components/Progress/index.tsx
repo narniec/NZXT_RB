@@ -5,11 +5,11 @@ import { Container } from './styles'
 
 export const Progress = (props: IProgressProps) => {
   const displaySize = window?.nzxt?.v1?.width ?? 320
-  const lineWidth = displaySize / 12 ?? 12
+  const lineWidth = displaySize / 12
   const thumbLineWidth = lineWidth
   const leftValue = props.leftValue ?? 0
   const rightValue = props.rightValue ?? 0
-  const size = displaySize ?? 320
+  const size = displaySize
   const radius = size * 0.5 - lineWidth / 2
   const circumference = radius * 2 * Math.PI
 
