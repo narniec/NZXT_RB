@@ -144,7 +144,24 @@ export const DualMonitor = () => {
   // Use the right-ring accent colour for the sparkline so it matches the theme
   const sparkColor = krakenStore.rightCircleStart.color
 
-  const Crypto = () => (
+  const textStyle = {
+    color: krakenStore.text.color + decToHex(krakenStore.text.alpha * 100),
+    fontFamily: krakenStore.text.font,
+  }
+
+  // USD/RUB row — shown at top alongside CPU/GPU
+  const RubRow = () => (
+    <div className="crypto-info" style={textStyle}>
+      <div className="crypto-row">
+        <span className="crypto-icon">₽</span>
+        <span className="crypto-value">{fmtRub(crypto.usdRub)}</span>
+        {crypto.fxStale && <span className="stale-dot" title="Cached" />}
+      </div>
+    </div>
+  )
+
+  // BTC + sparkline — shown at bottom
+  const BtcSection = () => (
     <>
       {/* Thin divider between hardware section and crypto section */}
       <div
@@ -152,20 +169,7 @@ export const DualMonitor = () => {
         style={{ background: krakenStore.separator.color }}
       />
 
-      <div
-        className="crypto-info"
-        style={{
-          color: krakenStore.text.color + decToHex(krakenStore.text.alpha * 100),
-          fontFamily: krakenStore.text.font,
-        }}
-      >
-        {/* USD/RUB row */}
-        <div className="crypto-row">
-          <span className="crypto-icon">₽</span>
-          <span className="crypto-value">{fmtRub(crypto.usdRub)}</span>
-          {crypto.fxStale && <span className="stale-dot" title="Cached" />}
-        </div>
-
+      <div className="crypto-info" style={textStyle}>
         {/* Sparkline */}
         {crypto.btcHistory.length >= 2 && (
           <Sparkline
@@ -226,6 +230,9 @@ export const DualMonitor = () => {
         rightCircleEnd={krakenStore.rightCircleEnd}
         background={krakenStore.circleBackground}
       >
+        {/* USD/RUB — top area */}
+        <RubRow />
+
         {/* CPU / GPU monitoring */}
         <div
           className="monitoring"
@@ -244,8 +251,8 @@ export const DualMonitor = () => {
           <Gpu />
         </div>
 
-        {/* BTC + Sparkline + USD/RUB */}
-        <Crypto />
+        {/* Sparkline + BTC — bottom area */}
+        <BtcSection />
       </Progress>
     </Container>
   )
