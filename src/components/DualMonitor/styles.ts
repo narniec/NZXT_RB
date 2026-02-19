@@ -113,8 +113,8 @@ export const Container = styled.div`
   }
 
   .crypto-icon {
-    font-size: 3.8vw;
-    opacity: 0.55;
+    font-size: 6.5vw;
+    opacity: 0.8;
   }
 
   .crypto-value {

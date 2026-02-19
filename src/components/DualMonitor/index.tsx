@@ -159,14 +159,11 @@ export const DualMonitor = () => {
           fontFamily: krakenStore.text.font,
         }}
       >
-        {/* BTC row */}
+        {/* USD/RUB row */}
         <div className="crypto-row">
-          <span className="crypto-icon">₿</span>
-          <span className="crypto-value">{fmtBtc(crypto.btcPrice)}</span>
-          {btcChangeStr && (
-            <span className={`crypto-change ${btcDir}`}>{btcChangeStr}</span>
-          )}
-          {crypto.btcStale && <span className="stale-dot" title="Cached" />}
+          <span className="crypto-icon">₽</span>
+          <span className="crypto-value">{fmtRub(crypto.usdRub)}</span>
+          {crypto.fxStale && <span className="stale-dot" title="Cached" />}
         </div>
 
         {/* Sparkline */}
@@ -179,11 +176,14 @@ export const DualMonitor = () => {
           />
         )}
 
-        {/* USD/RUB row */}
+        {/* BTC row */}
         <div className="crypto-row">
-          <span className="crypto-icon">₽</span>
-          <span className="crypto-value">{fmtRub(crypto.usdRub)}</span>
-          {crypto.fxStale && <span className="stale-dot" title="Cached" />}
+          <span className="crypto-icon">₿</span>
+          <span className="crypto-value">{fmtBtc(crypto.btcPrice)}</span>
+          {btcChangeStr && (
+            <span className={`crypto-change ${btcDir}`}>{btcChangeStr}</span>
+          )}
+          {crypto.btcStale && <span className="stale-dot" title="Cached" />}
         </div>
       </div>
     </>
