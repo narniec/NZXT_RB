@@ -14,6 +14,26 @@ import { ICryptoData } from './types'
 import { useCryptoStore } from 'store/crypto'
 import { TCoinId } from 'store/crypto/types'
 
+// ─── Cross-process sync ───────────────────────────────────────────────────────
+// CAM runs the widget in its own process — localStorage storage events don't
+// cross process boundaries. We poll every 4 seconds to detect setting changes
+// made in the Preferences page (opened in a regular browser tab).
+function useCrossProcessSync() {
+  React.useEffect(() => {
+    const syncIfChanged = () => {
+      useCryptoStore.persist.rehydrate()
+    }
+    // storage event: works for same-browser cross-tab updates
+    window.addEventListener('storage', syncIfChanged)
+    // polling: works even across separate processes (CAM + browser)
+    const poll = setInterval(syncIfChanged, 4_000)
+    return () => {
+      window.removeEventListener('storage', syncIfChanged)
+      clearInterval(poll)
+    }
+  }, [])
+}
+
 // ─── Coin metadata ─────────────────────────────────────────────────────────────
 
 interface CoinMeta {
@@ -177,6 +197,7 @@ async function fetchUsdRub(signal: AbortSignal): Promise<number | null> {
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export const useCrypto = (): ICryptoData => {
+  useCrossProcessSync()
   const { coin, priceIntervalMs, historyIntervalMs, fxIntervalMs } = useCryptoStore()
 
   const [data, setData] = React.useState<ICryptoData>(() => {
