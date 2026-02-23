@@ -155,13 +155,24 @@ async function fetchCoinHistory(meta: CoinMeta, signal: AbortSignal): Promise<nu
 }
 
 async function fetchUsdRub(signal: AbortSignal): Promise<number | null> {
+  // Use today's date to bypass jsDelivr CDN caching of @latest
+  const today = new Date().toISOString().slice(0, 10)
   const providers: Array<() => Promise<number>> = [
     async () => {
       const j = (await get(
-        'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json',
+        `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${today}/v1/currencies/usd.json`,
         signal,
       )) as { usd: Record<string, number> }
       const r = j.usd?.rub
+      if (!r) throw new Error('RUB missing')
+      return r
+    },
+    async () => {
+      // Central Bank of Russia — authoritative daily RUB rates, no API key needed
+      const j = (await get('https://www.cbr-xml-daily.ru/daily_json.js', signal)) as {
+        Valute: { USD: { Value: number } }
+      }
+      const r = j.Valute?.USD?.Value
       if (!r) throw new Error('RUB missing')
       return r
     },
